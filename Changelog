@@ -5,7 +5,8 @@ removed: 'Distributor'-related code. Use Avs+, if you want multi-threaded Avisyn
 new: implemented native HBD support. Only 16-bit and float for now. I'll add more stuff here once it will be merged in Avs+ from PR.
 new: -nstdr option. Silences all stderr output. Use it when piping to external encoder. 
 improvement: now application prints progress console, so -log is not needed under Wine. The output schema was reworked and should be better.
-Also migrated to avisynth_c.h from Avs+, it makes me easy to support new avs+ stuff when it will come.
+Also migrated to avisynth_c.h from Avs+, it makes me easy to support new avs+ stuff when it will come. 
+GCC will complaints about avisynth_c.h, but I think it's not that critical.
 
 0.26a DJATOM's mod (2014-8-26)
 fixed i420p10/i420p16 options bug (thx Isorkin for testing).
