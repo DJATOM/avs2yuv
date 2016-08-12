@@ -1,3 +1,12 @@
+0.27 DJATOM's mod 2 (2016-8-12)
+merged: new options from BM's mod 3 (depth, par, fps). Old 'wheels' removed.
+removed: -log option. Guess it useless now.
+removed: 'Distributor'-related code. Use Avs+, if you want multi-threaded Avisynth.
+new: implemented native HBD support. Only 16-bit and float for now. I'll add more stuff here once it will be merged in Avs+ from PR.
+new: -nstdr option. Silences all stderr output. Use it when piping to external encoder. 
+improvement: now application prints progress console, so -log is not needed under Wine. The output schema was reworked and should be better.
+Also migrated to avisynth_c.h from Avs+, it makes me easy to support new avs+ stuff when it will come.
+
 0.26a DJATOM's mod (2014-8-26)
 fixed i420p10/i420p16 options bug (thx Isorkin for testing).
 now I use MSVC 2012 with Intel Composer XE 2013 inbstead of MinGW.

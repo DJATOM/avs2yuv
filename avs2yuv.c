@@ -15,16 +15,16 @@
 #include <string.h>
 #include <io.h>
 #include <fcntl.h>
-#include "avs_internal.c"
-#include <signal.h>
+#include <avs_internal.c>
 #include <windows.h>
 #include <sys/timeb.h>
+#include <signal.h>
 
 #ifndef INT_MAX
 #define INT_MAX 0x7fffffff
 #endif
 
-#define MY_VERSION "Avs2YUV 0.26"
+#define MY_VERSION "Avs2YUV 0.27"
 #define AUTHORS "Writen by Loren Merritt, modified by BugMaster, Chikuzen\nand currently maintained by DJATOM"
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
@@ -41,17 +41,10 @@
 
 typedef signed __int64 int64_t;
 
-int64_t avs2yuv_mdate( void )
-{
-    struct timeb tb;
-    ftime( &tb );
-    return ((int64_t)tb.time * 1000 + (int64_t)tb.millitm) * 1000;
-}
-
 static int csp_to_int(const char *arg)
 {
-	if(!strcasecmp(arg, "auto"))
-		return CSP_AUTO;
+    if(!strcasecmp(arg, "auto"))
+        return CSP_AUTO;
     if(!strcmp(arg, "i420"))
         return CSP_I420;
     if(!strcmp(arg, "i422"))
@@ -66,7 +59,14 @@ static volatile int b_ctrl_c = 0;
 void sigintHandler(int sig_num)
 {
     exit(0);
-	b_ctrl_c = 1;
+    b_ctrl_c = 1;
+}
+
+int64_t avs2yuv_mdate(void)
+{
+    struct timeb tb;
+    ftime(&tb);
+    return ((int64_t)tb.time * 1000 + (int64_t)tb.millitm) * 1000;
 }
 
 int main(int argc, const char* argv[])
@@ -85,26 +85,22 @@ int main(int argc, const char* argv[])
     int interlaced = 0;
     int tff = 0;
     int csp = CSP_I420;
-	int input_depth = 8;
-	int guess_depth = 1;
-	int input_width;
-	int input_height;
-	unsigned fps_num = 0;
-	unsigned fps_den = 0;
-	unsigned par_width = 0;
-	unsigned par_height = 0;
-	
-	int i_frame = 0;
+    int input_depth = 8;
+    int input_width;
+    int input_height;
+    unsigned fps_num = 0;
+    unsigned fps_den = 0;
+    unsigned par_width = 0;
+    unsigned par_height = 0;
+    int i_frame = 0;
     int64_t i_frame_total = 0;
-	int64_t i_start = 0;
-	
-	SetConsoleTitle ("avs2yuv: preparing frameserver");
-    
-	for(int i = 1; i < argc; i++) {
+    int64_t i_start = 0;
+    SetConsoleTitle("avs2yuv: preparing frameserver");
+    for(int i = 1; i < argc; i++) {
         if(argv[i][0] == '-' && argv[i][1] != 0) {
             if(!strcmp(argv[i], "-h"))
                 usage = 1;
-			else if(!strcmp(argv[i], "-nstdr"))
+            else if(!strcmp(argv[i], "-nstdr"))
                 nostderr = 1;
             else if(!strcmp(argv[i], "-o")) {
                 if(i > argc-2) {
@@ -146,8 +142,7 @@ int main(int argc, const char* argv[])
                     return 2;
                 }
                 input_depth = atoi(argv[++i]);
-                guess_depth = 0;
-				if(input_depth < 8 || input_depth > 16) {
+                if(input_depth < 8 || input_depth > 16) {
                     fprintf(stderr, "-depth \"%s\" is not supported\n", argv[i]);
                     return 2;
                 }
@@ -206,7 +201,6 @@ add_outfile:
             out_fhs++;
         }
     }
-
     if(usage || !infile || (!out_fhs && !nostderr)) {
         fprintf(stderr, MY_VERSION "\n"AUTHORS "\n"
         "Usage: avs2yuv [options] in.avs [-o out.y4m] [-o out2.y4m]\n"
@@ -224,15 +218,13 @@ add_outfile:
         );
         return 2;
     }
-
     int retval = 1;
     avs_hnd_t avs_h = {0};
     if(internal_avs_load_library(&avs_h) < 0) {
         fprintf(stderr, "error: failed to load avisynth.dll\n");
         goto fail;
     }
-
-    avs_h.env = avs_h.func.avs_create_script_environment(AVS_INTERFACE_25);
+    avs_h.env = avs_h.func.avs_create_script_environment(AVISYNTH_INTERFACE_VERSION);
     if(avs_h.func.avs_get_error) {
         const char *error = avs_h.func.avs_get_error(avs_h.env);
         if(error) {
@@ -240,47 +232,19 @@ add_outfile:
             goto fail;
         }
     }
-
     AVS_Value arg = avs_new_value_string(infile);
     AVS_Value res = avs_h.func.avs_invoke(avs_h.env, "Import", arg, NULL);
     if(avs_is_error(res)) {
         fprintf(stderr, "error: %s\n", avs_as_string(res));
         goto fail;
     }
-    /* check if the user is using a multi-threaded script and apply distributor if necessary.
-       adapted from avisynth's vfw interface */
-    AVS_Value mt_test = avs_h.func.avs_invoke(avs_h.env, "GetMTMode", avs_new_value_bool(0), NULL);
-    int mt_mode = avs_is_int(mt_test) ? avs_as_int(mt_test) : 0;
-    avs_h.func.avs_release_value(mt_test);
-    if( mt_mode > 0 && mt_mode < 5 ) {
-        AVS_Value temp = avs_h.func.avs_invoke(avs_h.env, "Distributor", res, NULL);
-        avs_h.func.avs_release_value(res);
-        res = temp;
-    }
-	/* 
-		guess bit depth from avisynth script, 
-		requires BitsConvert wrapper and 
-		params w/o spaces, like "BitsConvert(16,1,10,2)"
-	*/
-	if(guess_depth) {
-		int p1 = -1, p2 = -1, p3 = -1, p4 = -1;
-		char guess_buf[200];
-		FILE * avsfs = fopen (infile, "r");
-		while (fgets(guess_buf, sizeof(guess_buf), avsfs) && (p1 == -1 || p2 == -1 || p3 == -1 || p4 == -1)) { //try to search untill we get desirable data
-			sscanf (guess_buf, "BitsConvert(%d,%d,%d,%d)", &p1, &p2, &p3, &p4); //ensure that line happens only one time in the script
-			if(p3 >= 9 || p3 <= 16 && p4 == 2) //react only when output is interleaved
-				input_depth = p3;
-		}
-		fclose (avsfs);
-	}
     if(!avs_is_clip(res)) {
         fprintf(stderr, "error: \"%s\" didn't return a video clip\n", infile);
         goto fail;
     }
     avs_h.clip = avs_h.func.avs_take_clip(res, avs_h.env);
     const AVS_VideoInfo *inf = avs_h.func.avs_get_video_info(avs_h.clip);
-    
-	if(!avs_has_video(inf)) {
+    if(!avs_has_video(inf)) {
         fprintf(stderr, "error: \"%s\" has no video data\n", infile);
         goto fail;
     }
@@ -296,57 +260,53 @@ add_outfile:
         interlaced = 1;
         tff = avs_is_tff(inf);
     }
-	if(!nostderr)
-		fprintf(stderr, "%s\n", MY_VERSION);
-	input_width  = inf->width;
-	input_height = inf->height;
-	if(input_depth > 8) {
-		if(input_width & 3) {
-			if(!nostderr)
-				fprintf(stderr, "avisynth %d-bit hack requires that width is at least mod4\n", input_depth);
-			goto fail;
-		}
-		if(!nostderr) 
-			fprintf(stderr, "avisynth %d-bit hack enabled\n", input_depth);
-		input_width >>= 1;
-	}
-	if(!fps_num || !fps_den) {
-		fps_num = inf->fps_numerator;
-		fps_den = inf->fps_denominator;
-	}
-	if(!nostderr) {
-		fprintf(stderr, "Script file:\t%s\nResolution:\t%dx%d\n", infile, input_width, input_height);
-		if(fps_den == 1)
-			fprintf(stderr, "Frames per sec:\t%u\n", fps_num);
-		else
-			fprintf(stderr, "Frames per sec:\t%u/%u (%.3f)\n", fps_num, fps_den, (float) fps_num/fps_den);
-		fprintf(stderr, "Total frames:\t%d\n", inf->num_frames);
-	}
-
+    if(!nostderr)
+        fprintf(stderr, "%s\n", MY_VERSION);
+    input_width  = inf->width;
+    input_height = inf->height;
+    if(input_depth > 8 && (!avs_h.func.avs_is_yv12(inf) || !avs_h.func.avs_is_yv16(inf) || !avs_h.func.avs_is_yv24(inf))) { //ignore native hbd cs
+        if(input_width & 3) {
+            if(!nostderr)
+                fprintf(stderr, "avisynth %d-bit hack requires that width is at least mod4\n", input_depth);
+            goto fail;
+        }
+        if(!nostderr) 
+            fprintf(stderr, "avisynth %d-bit hack enabled\n", input_depth);
+        input_width >>= 1;
+    }
+    if(!fps_num || !fps_den) {
+        fps_num = inf->fps_numerator;
+        fps_den = inf->fps_denominator;
+    }
+    if(!nostderr) {
+        fprintf(stderr, "Script file:\t%s\nResolution:\t%dx%d\n", infile, input_width, input_height);
+        if(fps_den == 1)
+            fprintf(stderr, "Frames per sec:\t%u\n", fps_num);
+        else
+            fprintf(stderr, "Frames per sec:\t%u/%u (%.3f)\n", fps_num, fps_den, (float) fps_num/fps_den);
+        fprintf(stderr, "Total frames:\t%d\n", inf->num_frames);
+    }
     if(csp == CSP_AUTO) {
-        if(avs_is_yv12(inf))
+        if(avs_h.func.avs_is_yv12(inf) || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf))
             csp = CSP_I420;
-        else if(avs_is_yv16(inf) || avs_is_yuy2(inf))
+        else if(avs_h.func.avs_is_yv16(inf) || avs_is_yuy2(inf) || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf))
             csp = CSP_I422;
-        else if(avs_is_yv24(inf))
+        else if(avs_h.func.avs_is_yv24(inf)|| avs_h.func.avs_is_yuv444ps(inf) || avs_h.func.avs_is_yuv444ps(inf))
             csp = CSP_I444;
         else
             csp = CSP_I420; // not supported colorspaces (like RGB) we try convert to I420
     }
-
-	signal(SIGINT, sigintHandler);
-	
-	//start processing
-	i_start = avs2yuv_mdate();
-	time_t tm_s = time(0);
-	i_frame_total  = inf->num_frames;
-	
-	if(b_ctrl_c)
-		goto close_files;
-		
-    if( (csp == CSP_I420 && !avs_is_yv12(inf)) ||
-        (csp == CSP_I422 && !avs_is_yv16(inf)) ||
-        (csp == CSP_I444 && !avs_is_yv24(inf)) )
+    signal(SIGINT, sigintHandler);
+    //start processing
+    i_start = avs2yuv_mdate();
+    time_t tm_s = time(0);
+    i_frame_total = inf->num_frames;
+    if(b_ctrl_c)
+        goto close_files;
+        
+    if( (csp == CSP_I420 && !(avs_h.func.avs_is_yv12(inf) || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf))) ||
+        (csp == CSP_I422 && !(avs_h.func.avs_is_yv16(inf) || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf))) ||
+        (csp == CSP_I444 && !(avs_h.func.avs_is_yv24(inf) || avs_h.func.avs_is_yuv444ps(inf)  || avs_h.func.avs_is_yuv444ps(inf))) )
     {
         if(input_depth > 8) {
             fprintf(stderr, "error: colorspace conversion is not possible with high depth input [%d-bit depth]\n", input_depth);
@@ -382,7 +342,6 @@ add_outfile:
         res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
     }
     avs_h.func.avs_release_value(res);
-
     for(int i = 0; i < out_fhs; i++) {
         if(!strcmp(outfile[i], "-")) {
             for(int j = 0; j < i; j++)
@@ -402,62 +361,75 @@ add_outfile:
             }
         }
     }
-
     char *interlace_type = interlaced ? tff ? "t" : "b" : "p";
     char csp_type[200];
     int chroma_h_shift = 0;
     int chroma_v_shift = 0;
     switch(csp) {
         case CSP_I420:
-            if(input_depth > 8)
+            if(input_depth > 8 || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf)) { //easy to implement new HBD cs if they will come
+                if(input_depth == 8) {
+                    if(avs_h.func.avs_is_yuv420p16(inf))
+                        input_depth = 16;
+                    else if(avs_h.func.avs_is_yuv420ps(inf))
+                        input_depth = 32;
+				}
                 sprintf(csp_type, "C420p%d XYSCSS=420P%d", input_depth, input_depth);
-            else
+            } else
                 strcpy(csp_type, "C420mpeg2 XYSCSS=420MPEG2");
             chroma_h_shift = 1;
             chroma_v_shift = 1;
             break;
         case CSP_I422:
-            if(input_depth > 8)
+            if(input_depth > 8 || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf)) {
+                if(input_depth == 8) {
+                    if(avs_h.func.avs_is_yuv422p16(inf))
+                        input_depth = 16;
+                    else if(avs_h.func.avs_is_yuv422ps(inf))
+                        input_depth = 32;
+				}
                 sprintf(csp_type, "C422p%d XYSCSS=422P%d", input_depth, input_depth);
-            else
+            } else
                 strcpy(csp_type, "C422 XYSCSS=422");
             chroma_h_shift = 1;
             break;
         case CSP_I444:
-            if(input_depth > 8)
+            if(input_depth > 8 || avs_h.func.avs_is_yuv444p16(inf) || avs_h.func.avs_is_yuv444ps(inf)) {
+                if(input_depth == 8) {
+                    if(avs_h.func.avs_is_yuv444p16(inf))
+                        input_depth = 16;
+                    else if(avs_h.func.avs_is_yuv444ps(inf))
+                        input_depth = 32;
+				}
                 sprintf(csp_type, "C444p%d XYSCSS=444P%d", input_depth, input_depth);
-            else
+            } else
                 strcpy(csp_type, "C444 XYSCSS=444");
             break;
         default:
             goto fail; //can't happen
     }
     for(int i = 0; i < out_fhs; i++) {
-        if(setvbuf(out_fh[i], NULL, _IOFBF, AVS_BUFSIZE))
-        {
+        if(setvbuf(out_fh[i], NULL, _IOFBF, AVS_BUFSIZE)) {
             fprintf(stderr, "error: failed to create buffer for \"%s\"\n", outfile[i]);
             goto fail;
         }
         if(!y4m_headers[i])
             continue;
-        fprintf(out_fh[i], "YUV4MPEG2 W%d H%d F%u:%u I%s A%u:%u %s\n",
-            input_width, input_height, fps_num, fps_den, interlace_type, par_width, par_height, csp_type);
+        fprintf(out_fh[i], "YUV4MPEG2 W%d H%d F%u:%u I%s A%u:%u %s\n", input_width, input_height, fps_num, fps_den, interlace_type, par_width, par_height, csp_type);
         fflush(out_fh[i]);
     }
-
-    int frame_size = inf->width * inf->height + 2 * (inf->width >> chroma_h_shift) * (inf->height >> chroma_v_shift);
+    int bits_shift = avs_h.func.avs_bytes_from_pixels(inf, 1) >> 1; //it's important for valid HBD output 
+    int frame_size = (inf->width << bits_shift) * inf->height + 2 * ((inf->width << bits_shift) >> chroma_h_shift) * (inf->height >> chroma_v_shift);
     int write_target = out_fhs * frame_size; // how many bytes per frame we expect to write
-
     if(slave) {
         seek = 0;
         end = INT_MAX;
-		SetConsoleTitle ("avs2yuv: slave mode");
+        SetConsoleTitle("avs2yuv: slave process running");
     } else {
         end += seek;
         if(end <= seek || end > inf->num_frames)
             end = inf->num_frames;
     }
-
     for(int frm = seek; frm < end; ++frm) {
         if(slave) {
             char input[80];
@@ -470,27 +442,23 @@ add_outfile:
             if(frm >= inf->num_frames)
                 frm = inf->num_frames-1;
         }
-
         AVS_VideoFrame *f = avs_h.func.avs_get_frame(avs_h.clip, frm);
         const char *err = avs_h.func.avs_clip_get_error(avs_h.clip);
         if(err) {
             fprintf(stderr, "error: %s occurred while reading frame %d\n", err, frm);
             goto fail;
         }
-
         if(out_fhs) {
             static const int planes[] = {AVS_PLANAR_Y, AVS_PLANAR_U, AVS_PLANAR_V};
             int wrote = 0;
-
             for(int i = 0; i < out_fhs; i++)
                 if(y4m_headers[i])
                     fwrite("FRAME\n", 1, 6, out_fh[i]);
-
             for(int p = 0; p < 3; p++) {
-                int w = inf->width  >> (p ? chroma_h_shift : 0);
+                int w = (inf->width << bits_shift) >> (p ? chroma_h_shift : 0);
                 int h = inf->height >> (p ? chroma_v_shift : 0);
-                int pitch = avs_get_pitch_p(f, planes[p]);
-                const BYTE* data = avs_get_read_ptr_p(f, planes[p]);
+                int pitch = avs_h.func.avs_get_pitch_p(f, planes[p]);
+                const BYTE* data = avs_h.func.avs_get_read_ptr_p(f, planes[p]);
                 for(int y = 0; y < h; y++) {
                     for(int i = 0; i < out_fhs; i++)
                         wrote += fwrite(data, 1, w, out_fh[i]);
@@ -506,48 +474,44 @@ add_outfile:
                     fflush(out_fh[i]);
             }
         }
-		if(frm == 0) {
-			SetConsoleTitle ("avs2yuv: executing script");
-		}
-		// an advanced verbose output, which is ported from x264
-		if(!nostderr) {
-			char buf[400];
-			int64_t i_time = avs2yuv_mdate();
-			int64_t i_elapsed = i_time - i_start;
-			double fps = i_elapsed > 0 ? frm * 1000000. / i_elapsed : 0;
-			i_frame = frm + 1;
-			int secs = i_elapsed / 1000000;
-			int eta = i_elapsed * (i_frame_total - i_frame) / ((int64_t)i_frame * 1000000);
-			if(!nostderr) {
-				sprintf( buf, "avs2yuv [%.1f%%], %d/%d frames, %.2f fps, eta %d:%02d:%02d", 100. * frm / i_frame_total, frm, (int) i_frame_total, fps, eta/3600, (eta/60)%60, eta%60 );
-				SetConsoleTitle (buf);
-				static int print_progress_header = 1;
-				if( print_progress_header )
-				{
-					fprintf( stderr, "%6s  %12s  %7s %9s %9s\n", "Progress", "Frames   ", "FPS", "Elapsed", "Remain" );
-					print_progress_header = 0;
-				}
-				sprintf( buf, "[%5.1f%%] %6d/%-6d %8.2f %3d:%02d:%02d %3d:%02d:%02d", 
-					100. * frm / i_frame_total, frm, (int) i_frame_total, fps, secs/3600, (secs/60)%60, secs%60, eta/3600, (eta/60)%60, eta%60 );
-				fprintf ( stderr, "%s   \r", buf );
-			}
-			fflush( stderr ); // needed in windows
-		}
+        if(frm == 0) {
+            SetConsoleTitle("avs2yuv: executing script");
+        }
+        if(!nostderr) {
+            char buf[400];
+            int64_t i_time = avs2yuv_mdate();
+            int64_t i_elapsed = i_time - i_start;
+            double fps = i_elapsed > 0 ? frm * 1000000. / i_elapsed : 0;
+            i_frame = frm + 1;
+            int secs = i_elapsed / 1000000;
+            int eta = i_elapsed * (i_frame_total - i_frame) / ((int64_t)i_frame * 1000000);
+            if(!nostderr) {
+                sprintf(buf, "avs2yuv [%.1f%%], %d/%d frames, %.2f fps, eta %d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, eta / 3600, (eta / 60) % 60, eta % 60);
+                SetConsoleTitle(buf);
+                static int print_progress_header = 1;
+                if(print_progress_header) {
+                    fprintf(stderr, "%6s %12s   %7s %9s %9s\n", "Progress", "Frames", "FPS", "Elapsed", "Remain");
+                    print_progress_header = 0;
+                }
+                sprintf(buf, "[%5.1f%%] %6d/%-6d %8.2f %3d:%02d:%02d %3d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60);
+                fprintf(stderr, "%s   \r", buf);
+            }
+            fflush(stderr);
+        }
         avs_h.func.avs_release_video_frame(f);
     }
-
     for(int i = 0; i < out_fhs; i++)
         fflush(out_fh[i]);
-
 close_files:
     retval = 0;
-	if(!nostderr) {
-		time_t tm2 = time(NULL);
-		fprintf (stderr, "Started:\t%s", ctime(&tm_s));
-		fprintf (stderr, "Finished:\t%s", ctime(&tm2));
-		tm2 = tm2 - tm_s;
-		fprintf ( stderr, "Elapsed:\t%d:%02d:%02d\n", (int) tm2 / 3600, (int) tm2 % 3600 / 60, (int) tm2 % 60 );	
-	}
+    if(!nostderr) {
+        time_t tm2 = time(NULL);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Started:\t%s", ctime(&tm_s));
+        fprintf(stderr, "Finished:\t%s", ctime(&tm2));
+        tm2 = tm2 - tm_s;
+        fprintf (stderr, "Elapsed:\t%d:%02d:%02d", (int)tm2 / 3600, (int)tm2 % 3600 / 60, (int)tm2 % 60);    
+    }
 fail:
     for(int i = 0; i < out_fhs; i++)
         if(out_fh[i])
