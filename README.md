@@ -3,7 +3,7 @@ avs2yuv
 A simple tool that can execute avisynth scripts. 
 This version is intended to be used with Avisynth+.
 
-Compilling (under linux)
+Compiling (under linux)
 =======
 Arch | commannd
 ---- | ----
