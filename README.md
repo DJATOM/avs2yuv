@@ -1,11 +1,11 @@
 avs2yuv
 =======
+A simple tool that can execute avisynth scripts. 
+This version is intended to be used with Avisynth+.
 
-A simple tool for executing avisynth scripts.
-
-Compile
+Compilling (under linux)
 =======
-
-gcc avs2yuv.c -o avs2yuv.exe -O3 -ffast-math -Wall -Wshadow -Wempty-body -I. -std=gnu99 -fomit-frame-pointer -s -fno-tree-vectorize -fno-zero-initialized-in-bss 
-=== or ===
-icl /Tc avs2yuv.c -O3 -W0 -I. -Qstd=c99 -o avs2yuv.exe
+Arch | commannd
+---- | ----
+32-bit | make -f Makefile.win
+64-bit | make -f Makefile.win64
