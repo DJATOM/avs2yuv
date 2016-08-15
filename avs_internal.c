@@ -84,6 +84,8 @@ typedef struct
         AVSC_DECLARE_FUNC(avs_vsprintf);
 
         AVSC_DECLARE_FUNC(avs_get_error);
+        AVSC_DECLARE_FUNC(avs_is_rgb48);
+        AVSC_DECLARE_FUNC(avs_is_rgb64);
         AVSC_DECLARE_FUNC(avs_is_yv24);
         AVSC_DECLARE_FUNC(avs_is_yv16);
         AVSC_DECLARE_FUNC(avs_is_yv12);
@@ -97,6 +99,13 @@ typedef struct
         AVSC_DECLARE_FUNC(avs_is_yuv422ps);
         AVSC_DECLARE_FUNC(avs_is_yuv420ps);
         AVSC_DECLARE_FUNC(avs_is_y32);
+        AVSC_DECLARE_FUNC(avs_is_444);
+        AVSC_DECLARE_FUNC(avs_is_422);
+        AVSC_DECLARE_FUNC(avs_is_420);
+        AVSC_DECLARE_FUNC(avs_is_y);
+        AVSC_DECLARE_FUNC(avs_is_yuva);
+        AVSC_DECLARE_FUNC(avs_is_planar_rgb);
+        AVSC_DECLARE_FUNC(avs_is_planar_rgba);
         AVSC_DECLARE_FUNC(avs_is_color_space);
 
         AVSC_DECLARE_FUNC(avs_get_plane_width_subsampling);
@@ -111,6 +120,10 @@ typedef struct
         AVSC_DECLARE_FUNC(avs_get_read_ptr_p);
         AVSC_DECLARE_FUNC(avs_is_writable);
         AVSC_DECLARE_FUNC(avs_get_write_ptr_p);
+
+        AVSC_DECLARE_FUNC(avs_num_components);
+        AVSC_DECLARE_FUNC(avs_component_size);
+        AVSC_DECLARE_FUNC(avs_bits_per_component);
     } func;
 } avs_hnd_t;
 
@@ -159,6 +172,8 @@ static int internal_avs_load_library(avs_hnd_t *h)
     LOAD_AVS_FUNC(avs_vsprintf, 0);
 
     LOAD_AVS_FUNC(avs_get_error, 1);
+    LOAD_AVS_FUNC(avs_is_rgb48, 0);
+    LOAD_AVS_FUNC(avs_is_rgb64, 0);
     LOAD_AVS_FUNC(avs_is_yv24, 0);
     LOAD_AVS_FUNC(avs_is_yv16, 0);
     LOAD_AVS_FUNC(avs_is_yv12, 0);
@@ -172,6 +187,13 @@ static int internal_avs_load_library(avs_hnd_t *h)
     LOAD_AVS_FUNC(avs_is_yuv422ps, 0);
     LOAD_AVS_FUNC(avs_is_yuv420ps, 0);
     LOAD_AVS_FUNC(avs_is_y32, 0);
+    LOAD_AVS_FUNC(avs_is_444, 0);
+    LOAD_AVS_FUNC(avs_is_422, 0);
+    LOAD_AVS_FUNC(avs_is_420, 0);
+    LOAD_AVS_FUNC(avs_is_y, 0);
+    LOAD_AVS_FUNC(avs_is_yuva, 0);
+    LOAD_AVS_FUNC(avs_is_planar_rgb, 0);
+    LOAD_AVS_FUNC(avs_is_planar_rgba, 0);
     LOAD_AVS_FUNC(avs_is_color_space, 0);
 
     LOAD_AVS_FUNC(avs_get_plane_width_subsampling, 0);
@@ -186,6 +208,10 @@ static int internal_avs_load_library(avs_hnd_t *h)
     LOAD_AVS_FUNC(avs_get_read_ptr_p, 0);
     LOAD_AVS_FUNC(avs_is_writable, 0);
     LOAD_AVS_FUNC(avs_get_write_ptr_p, 0);
+
+    LOAD_AVS_FUNC(avs_num_components, 0);
+    LOAD_AVS_FUNC(avs_component_size, 0);
+    LOAD_AVS_FUNC(avs_bits_per_component, 0);
     return 0;
 fail:
     FreeLibrary(h->library);

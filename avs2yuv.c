@@ -24,7 +24,7 @@
 #define INT_MAX 0x7fffffff
 #endif
 
-#define MY_VERSION "Avs2YUV 0.27"
+#define MY_VERSION "Avs2YUV 0.28"
 #define AUTHORS "Writen by Loren Merritt, modified by BugMaster, Chikuzen\nand currently maintained by DJATOM"
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
@@ -34,25 +34,8 @@
 
 #define MAX_FH 10
 #define AVS_BUFSIZE (128*1024)
-#define CSP_AUTO (-1)
-#define CSP_I420 1
-#define CSP_I422 2
-#define CSP_I444 3
 
 typedef signed __int64 int64_t;
-
-static int csp_to_int(const char *arg)
-{
-    if(!strcasecmp(arg, "auto"))
-        return CSP_AUTO;
-    if(!strcmp(arg, "i420"))
-        return CSP_I420;
-    if(!strcmp(arg, "i422"))
-        return CSP_I422;
-    if(!strcmp(arg, "i444"))
-        return CSP_I444;
-    return 0;
-}
 
 static volatile int b_ctrl_c = 0;
 
@@ -84,7 +67,6 @@ int main(int argc, const char* argv[])
     int rawyuv = 0;
     int interlaced = 0;
     int tff = 0;
-    int csp = CSP_I420;
     int input_depth = 8;
     int input_width;
     int input_height;
@@ -104,21 +86,21 @@ int main(int argc, const char* argv[])
                 nostderr = 1;
             else if(!strcmp(argv[i], "-o")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-o needs an argument\n");
+                    fprintf(stderr, "Error: -o needs an argument.\n");
                     return 2;
                 }
                 i++;
                 goto add_outfile;
             } else if(!strcmp(argv[i], "-seek")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-seek needs an argument\n");
+                    fprintf(stderr, "Error: -seek needs an argument.\n");
                     return 2;
                 }
                 seek = atoi(argv[++i]);
                 if(seek < 0) usage = 1;
             } else if(!strcmp(argv[i], "-frames")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-frames needs an argument\n");
+                    fprintf(stderr, "Error: -frames needs an argument.\n");
                     return 2;
                 }
                 end = atoi(argv[++i]);
@@ -126,29 +108,19 @@ int main(int argc, const char* argv[])
                 rawyuv = 1;
             } else if(!strcmp(argv[i], "-slave")) {
                 slave = 1;
-            } else if(!strcmp(argv[i], "-csp")) {
-                if(i > argc-2) {
-                    fprintf(stderr, "-csp needs an argument\n");
-                    return 2;
-                }
-                csp = csp_to_int(argv[++i]);
-                if(!csp) {
-                    fprintf(stderr, "-csp \"%s\" is unknown\n", argv[i]);
-                    return 2;
-                }
             } else if(!strcmp(argv[i], "-depth")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-depth needs an argument\n");
+                    fprintf(stderr, "Error: -depth needs an argument.\n");
                     return 2;
                 }
                 input_depth = atoi(argv[++i]);
                 if(input_depth < 8 || input_depth > 16) {
-                    fprintf(stderr, "-depth \"%s\" is not supported\n", argv[i]);
+                    fprintf(stderr, "Error: -depth \"%s\" is not supported.\n", argv[i]);
                     return 2;
                 }
             } else if(!strcmp(argv[i], "-fps")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-fps needs an argument\n");
+                    fprintf(stderr, "Error: -fps needs an argument.\n");
                     return 2;
                 }
                 const char *str = argv[++i];
@@ -166,34 +138,34 @@ int main(int argc, const char* argv[])
                     }
                 }
                 if(!fps_num || !fps_den) {
-                    fprintf(stderr, "-fps \"%s\" is not supported\n", str);
+                    fprintf(stderr, "Error: -fps \"%s\" is not supported.\n", str);
                     return 2;
                 }
             } else if(!strcmp(argv[i], "-par")) {
                 if(i > argc-2) {
-                    fprintf(stderr, "-par needs an argument\n");
+                    fprintf(stderr, "Error: -par needs an argument.\n");
                     return 2;
                 }
                 const char *str = argv[++i];
                 if( (sscanf(str, "%u:%u", &par_width, &par_height) != 2) &&
                     (sscanf(str, "%u/%u", &par_width, &par_height) != 2) )
                 {
-                    fprintf(stderr, "-par \"%s\" is not supported\n", str);
+                    fprintf(stderr, "Error: -par \"%s\" is not supported.\n", str);
                     return 2;
                 }
             } else {
-                fprintf(stderr, "no such option: %s\n", argv[i]);
+                fprintf(stderr, "Error: no such option \"%s\".\n", argv[i]);
                 return 2;
             }
         } else if(!infile) {
             infile = argv[i];
             const char *dot = strrchr(infile, '.');
             if(!dot || strcmp(".avs", dot))
-                fprintf(stderr, "infile \"%s\" doesn't look like an avisynth script\n", infile);
+                fprintf(stderr, "Error: infile \"%s\" doesn't look like an avisynth script.\n", infile);
         } else {
 add_outfile:
             if(out_fhs > MAX_FH-1) {
-                fprintf(stderr, "too many output files\n");
+                fprintf(stderr, "Error: too many output files.\n");
                 return 2;
             }
             outfile[out_fhs] = argv[i];
@@ -208,8 +180,7 @@ add_outfile:
         "-seek\tseek to the given frame number\n"
         "-frames\tstop after processing this many frames\n"
         "-slave\tinit script and do nothing\n\t(useful for piping from TCPDeliver to AvsNetPipe)\n"
-        "-raw\toutput raw I420/I422/I444 instead of yuv4mpeg\n"
-        "-csp\tconvert to I420/I422/I444 or AUTO colorspace (default I420)\n"
+        "-raw\toutput raw data\n"
         "-depth\tspecify input bit depth\n\t(default 8, trying to guess from the script)\n"
         "-fps\toverwrite input framerate\n"
         "-par\tspecify pixel aspect ratio\n"
@@ -221,39 +192,43 @@ add_outfile:
     int retval = 1;
     avs_hnd_t avs_h = {0};
     if(internal_avs_load_library(&avs_h) < 0) {
-        fprintf(stderr, "error: failed to load avisynth.dll\n");
+        fprintf(stderr, "Error: failed to load avisynth.dll.\n");
         goto fail;
-    }
+    }        
     avs_h.env = avs_h.func.avs_create_script_environment(AVISYNTH_INTERFACE_VERSION);
     if(avs_h.func.avs_get_error) {
         const char *error = avs_h.func.avs_get_error(avs_h.env);
         if(error) {
-            fprintf(stderr, "error: %s\n", error);
+            fprintf(stderr, "Error: %s.\n", error);
             goto fail;
         }
     }
     AVS_Value arg = avs_new_value_string(infile);
     AVS_Value res = avs_h.func.avs_invoke(avs_h.env, "Import", arg, NULL);
     if(avs_is_error(res)) {
-        fprintf(stderr, "error: %s\n", avs_as_string(res));
+        fprintf(stderr, "Error: %s.\n", avs_as_string(res));
         goto fail;
     }
     if(!avs_is_clip(res)) {
-        fprintf(stderr, "error: \"%s\" didn't return a video clip\n", infile);
+        fprintf(stderr, "Error: \"%s\" didn't return a video clip.\n", infile);
         goto fail;
     }
     avs_h.clip = avs_h.func.avs_take_clip(res, avs_h.env);
     const AVS_VideoInfo *inf = avs_h.func.avs_get_video_info(avs_h.clip);
     if(!avs_has_video(inf)) {
-        fprintf(stderr, "error: \"%s\" has no video data\n", infile);
+        fprintf(stderr, "Error: \"%s\" has no video data.\n", infile);
+        goto fail;
+    }
+    if(!avs_h.func.avs_component_size(inf)) {
+        fprintf(stderr, "Error: this program only works with Avisynth+.\n");
         goto fail;
     }
     /* if the clip is made of fields instead of frames, call weave to make them frames */
     if(avs_is_field_based(inf)) {
-        fprintf(stderr, "detected fieldbased (separated) input, weaving to frames\n");
+        fprintf(stderr, "Detected fieldbased (separated) input, weaving to frames.\n");
         AVS_Value tmp = avs_h.func.avs_invoke(avs_h.env, "Weave", res, NULL);
         if(avs_is_error(tmp)) {
-            fprintf(stderr, "error: couldn't weave fields into frames\n");
+            fprintf(stderr, "Error: couldn't weave fields into frames.\n");
             goto fail;
         }
         res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
@@ -264,15 +239,16 @@ add_outfile:
         fprintf(stderr, "%s\n", MY_VERSION);
     input_width  = inf->width;
     input_height = inf->height;
-    if(input_depth > 8 && (!avs_h.func.avs_is_yv12(inf) || !avs_h.func.avs_is_yv16(inf) || !avs_h.func.avs_is_yv24(inf))) { //ignore native hbd cs
+    if(input_depth > 8 && (avs_h.func.avs_is_yv12(inf) || avs_h.func.avs_is_yv16(inf) || avs_h.func.avs_is_yv24(inf))) { //ignore native hbd cs
         if(input_width & 3) {
             if(!nostderr)
-                fprintf(stderr, "avisynth %d-bit hack requires that width is at least mod4\n", input_depth);
+                fprintf(stderr, "Error: avisynth %d-bit hack requires that width is at least mod4.\n", input_depth);
             goto fail;
         }
-        if(!nostderr) 
-            fprintf(stderr, "avisynth %d-bit hack enabled\n", input_depth);
-        input_width >>= 1;
+        if(!nostderr)
+            fprintf(stderr, "Avisynth %d-bit hack enabled!\n", input_depth);
+        if(avs_h.func.avs_component_size(inf) == 1)
+            input_width >>= 1;
     }
     if(!fps_num || !fps_den) {
         fps_num = inf->fps_numerator;
@@ -286,16 +262,6 @@ add_outfile:
             fprintf(stderr, "Frames per sec:\t%u/%u (%.3f)\n", fps_num, fps_den, (float) fps_num/fps_den);
         fprintf(stderr, "Total frames:\t%d\n", inf->num_frames);
     }
-    if(csp == CSP_AUTO) {
-        if(avs_h.func.avs_is_yv12(inf) || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf))
-            csp = CSP_I420;
-        else if(avs_h.func.avs_is_yv16(inf) || avs_is_yuy2(inf) || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf))
-            csp = CSP_I422;
-        else if(avs_h.func.avs_is_yv24(inf)|| avs_h.func.avs_is_yuv444ps(inf) || avs_h.func.avs_is_yuv444ps(inf))
-            csp = CSP_I444;
-        else
-            csp = CSP_I420; // not supported colorspaces (like RGB) we try convert to I420
-    }
     signal(SIGINT, sigintHandler);
     //start processing
     i_start = avs2yuv_mdate();
@@ -303,50 +269,12 @@ add_outfile:
     i_frame_total = inf->num_frames;
     if(b_ctrl_c)
         goto close_files;
-        
-    if( (csp == CSP_I420 && !(avs_h.func.avs_is_yv12(inf) || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf))) ||
-        (csp == CSP_I422 && !(avs_h.func.avs_is_yv16(inf) || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf))) ||
-        (csp == CSP_I444 && !(avs_h.func.avs_is_yv24(inf) || avs_h.func.avs_is_yuv444ps(inf)  || avs_h.func.avs_is_yuv444ps(inf))) )
-    {
-        if(input_depth > 8) {
-            fprintf(stderr, "error: colorspace conversion is not possible with high depth input [%d-bit depth]\n", input_depth);
-            goto fail;
-        }
-        const char *csp_name = csp == CSP_I444 ? "YV24" :
-                               csp == CSP_I422 ? "YV16" :
-                               "YV12";
-        fprintf(stderr, "converting input clip to %s\n", csp_name);
-        if(csp < CSP_I444 && (inf->width&1)) {
-            fprintf(stderr, "error: input clip width not divisible by 2 (%dx%d)\n", inf->width, inf->height);
-            goto fail;
-        }
-        if(csp == CSP_I420 && interlaced && (inf->height&3)) {
-            fprintf(stderr, "error: input clip height not divisible by 4 (%dx%d)\n", inf->width, inf->height);
-            goto fail;
-        }
-        if((csp == CSP_I420 || interlaced) && (inf->height&1)) {
-            fprintf(stderr, "error: input clip height not divisible by 2 (%dx%d)\n", inf->width, inf->height);
-            goto fail;
-        }
-        const char *arg_name[2] = {NULL, "interlaced"};
-        AVS_Value arg_arr[2];
-        arg_arr[0] = res;
-        arg_arr[1] = avs_new_value_bool(interlaced);
-        char conv_func[14] = {"ConvertTo"};
-        strcat(conv_func, csp_name);
-        AVS_Value tmp = avs_h.func.avs_invoke(avs_h.env, conv_func, avs_new_value_array(arg_arr, 2), arg_name);
-        if(avs_is_error(tmp)) {
-            fprintf(stderr, "error: couldn't convert input clip to %s\n", csp_name);
-            goto fail;
-        }
-        res = internal_avs_update_clip(&avs_h, &inf, tmp, res);
-    }
     avs_h.func.avs_release_value(res);
     for(int i = 0; i < out_fhs; i++) {
         if(!strcmp(outfile[i], "-")) {
             for(int j = 0; j < i; j++)
                 if(out_fh[j] == stdout) {
-                    fprintf(stderr, "error: can't write to stdout multiple times\n");
+                    fprintf(stderr, "Error: can't write to stdout multiple times.\n");
                     goto fail;
                 }
             int dupout = _dup(_fileno(stdout));
@@ -356,7 +284,7 @@ add_outfile:
         } else {
             out_fh[i] = fopen(outfile[i], "wb");
             if(!out_fh[i]) {
-                fprintf(stderr, "error: failed to create/open \"%s\"\n", outfile[i]);
+                fprintf(stderr, "Error: failed to create/open \"%s\".\n", outfile[i]);
                 goto fail;
             }
         }
@@ -365,52 +293,47 @@ add_outfile:
     char csp_type[200];
     int chroma_h_shift = 0;
     int chroma_v_shift = 0;
-    switch(csp) {
-        case CSP_I420:
-            if(input_depth > 8 || avs_h.func.avs_is_yuv420p16(inf) || avs_h.func.avs_is_yuv420ps(inf)) { //easy to implement new HBD cs if they will come
-                if(input_depth == 8) {
-                    if(avs_h.func.avs_is_yuv420p16(inf))
-                        input_depth = 16;
-                    else if(avs_h.func.avs_is_yuv420ps(inf))
-                        input_depth = 32;
-				}
-                sprintf(csp_type, "C420p%d XYSCSS=420P%d", input_depth, input_depth);
-            } else
-                strcpy(csp_type, "C420mpeg2 XYSCSS=420MPEG2");
-            chroma_h_shift = 1;
-            chroma_v_shift = 1;
-            break;
-        case CSP_I422:
-            if(input_depth > 8 || avs_h.func.avs_is_yuv422p16(inf) || avs_h.func.avs_is_yuv422ps(inf)) {
-                if(input_depth == 8) {
-                    if(avs_h.func.avs_is_yuv422p16(inf))
-                        input_depth = 16;
-                    else if(avs_h.func.avs_is_yuv422ps(inf))
-                        input_depth = 32;
-				}
-                sprintf(csp_type, "C422p%d XYSCSS=422P%d", input_depth, input_depth);
-            } else
-                strcpy(csp_type, "C422 XYSCSS=422");
-            chroma_h_shift = 1;
-            break;
-        case CSP_I444:
-            if(input_depth > 8 || avs_h.func.avs_is_yuv444p16(inf) || avs_h.func.avs_is_yuv444ps(inf)) {
-                if(input_depth == 8) {
-                    if(avs_h.func.avs_is_yuv444p16(inf))
-                        input_depth = 16;
-                    else if(avs_h.func.avs_is_yuv444ps(inf))
-                        input_depth = 32;
-				}
-                sprintf(csp_type, "C444p%d XYSCSS=444P%d", input_depth, input_depth);
-            } else
-                strcpy(csp_type, "C444 XYSCSS=444");
-            break;
-        default:
-            goto fail; //can't happen
+    if(avs_h.func.avs_is_y(inf)) {
+        if(input_depth == 16)
+            sprintf(csp_type, "Cmono16 XYSCSS=Cmono16");
+        else if(avs_h.func.avs_bits_per_component(inf) == 16)
+            sprintf(csp_type, "Cmono16 XYSCSS=Cmono16");
+        else if((avs_h.func.avs_bits_per_component(inf) > 8 && avs_h.func.avs_bits_per_component(inf) < 16) || (input_depth > 8 && input_depth < 16)) {
+            fprintf(stderr, "Warning: output bit-depth is forced to 16 (was %d)!\n", avs_h.func.avs_bits_per_component(inf));
+            sprintf(csp_type, "Cmono16 XYSCSS=Cmono16");
+        } else
+            sprintf(csp_type, "Cmono");
+    } else if(avs_h.func.avs_is_420(inf)) {
+        chroma_h_shift = 1;
+        chroma_v_shift = 1;
+        if(input_depth > 8)
+            sprintf(csp_type, "C420p%d XYSCSS=C420p%d", input_depth, input_depth);
+        else if(avs_h.func.avs_bits_per_component(inf) > 8)
+            sprintf(csp_type, "C420p%d XYSCSS=C420p%d", avs_h.func.avs_bits_per_component(inf), avs_h.func.avs_bits_per_component(inf));
+        else 
+            sprintf(csp_type, "C420mpeg2");
+    } else if(avs_h.func.avs_is_422(inf)) {
+        chroma_h_shift = 1;
+        if(input_depth > 8)
+            sprintf(csp_type, "C422p%d XYSCSS=C422p%d", input_depth, input_depth);
+        else if(avs_h.func.avs_bits_per_component(inf) > 8)
+            sprintf(csp_type, "C422p%d XYSCSS=C422p%d", avs_h.func.avs_bits_per_component(inf), avs_h.func.avs_bits_per_component(inf));
+        else
+            sprintf(csp_type, "C422");
+    } else if(avs_h.func.avs_is_444(inf)) {
+        if(input_depth > 8)
+            sprintf(csp_type, "C444p%d XYSCSS=C444p%d", input_depth, input_depth);
+        else if(avs_h.func.avs_bits_per_component(inf) > 8)
+            sprintf(csp_type, "C444p%d XYSCSS=C444p%d", avs_h.func.avs_bits_per_component(inf), avs_h.func.avs_bits_per_component(inf));
+        else
+            sprintf(csp_type, "C444");
+    } else {
+        fprintf(stderr, "Error: unsupported colorspace.\n");
+        goto fail;
     }
     for(int i = 0; i < out_fhs; i++) {
         if(setvbuf(out_fh[i], NULL, _IOFBF, AVS_BUFSIZE)) {
-            fprintf(stderr, "error: failed to create buffer for \"%s\"\n", outfile[i]);
+            fprintf(stderr, "Error: failed to create buffer for \"%s\".\n", outfile[i]);
             goto fail;
         }
         if(!y4m_headers[i])
@@ -418,8 +341,7 @@ add_outfile:
         fprintf(out_fh[i], "YUV4MPEG2 W%d H%d F%u:%u I%s A%u:%u %s\n", input_width, input_height, fps_num, fps_den, interlace_type, par_width, par_height, csp_type);
         fflush(out_fh[i]);
     }
-    int bits_shift = avs_h.func.avs_bytes_from_pixels(inf, 1) >> 1; //it's important for valid HBD output 
-    int frame_size = (inf->width << bits_shift) * inf->height + 2 * ((inf->width << bits_shift) >> chroma_h_shift) * (inf->height >> chroma_v_shift);
+    int frame_size = (inf->width * avs_h.func.avs_component_size(inf)) * inf->height + (avs_h.func.avs_num_components(inf) - 1) * ((inf->width * avs_h.func.avs_component_size(inf)) >> chroma_h_shift) * (inf->height >> chroma_v_shift);
     int write_target = out_fhs * frame_size; // how many bytes per frame we expect to write
     if(slave) {
         seek = 0;
@@ -445,7 +367,7 @@ add_outfile:
         AVS_VideoFrame *f = avs_h.func.avs_get_frame(avs_h.clip, frm);
         const char *err = avs_h.func.avs_clip_get_error(avs_h.clip);
         if(err) {
-            fprintf(stderr, "error: %s occurred while reading frame %d\n", err, frm);
+            fprintf(stderr, "Error: %s occurred while reading frame %d.\n", err, frm);
             goto fail;
         }
         if(out_fhs) {
@@ -454,8 +376,8 @@ add_outfile:
             for(int i = 0; i < out_fhs; i++)
                 if(y4m_headers[i])
                     fwrite("FRAME\n", 1, 6, out_fh[i]);
-            for(int p = 0; p < 3; p++) {
-                int w = (inf->width << bits_shift) >> (p ? chroma_h_shift : 0);
+            for(int p = 0; p < avs_h.func.avs_num_components(inf); p++) {
+                int w = (inf->width * avs_h.func.avs_component_size(inf)) >> (p ? chroma_h_shift : 0);
                 int h = inf->height >> (p ? chroma_v_shift : 0);
                 int pitch = avs_h.func.avs_get_pitch_p(f, planes[p]);
                 const BYTE* data = avs_h.func.avs_get_read_ptr_p(f, planes[p]);
@@ -466,7 +388,7 @@ add_outfile:
                 }
             }
             if(wrote != write_target) {
-                fprintf(stderr, "error: wrote only %d of %d bytes\n", wrote, write_target);
+                fprintf(stderr, "Error: wrote only %d of %d bytes.\n", wrote, write_target);
                 goto fail;
             }
             if(slave) { // assume timing doesn't matter in other modes
@@ -510,7 +432,7 @@ close_files:
         fprintf(stderr, "Started:\t%s", ctime(&tm_s));
         fprintf(stderr, "Finished:\t%s", ctime(&tm2));
         tm2 = tm2 - tm_s;
-        fprintf (stderr, "Elapsed:\t%d:%02d:%02d", (int)tm2 / 3600, (int)tm2 % 3600 / 60, (int)tm2 % 60);    
+        fprintf(stderr, "Elapsed:\t%d:%02d:%02d\n", (int)tm2 / 3600, (int)tm2 % 3600 / 60, (int)tm2 % 60);
     }
 fail:
     for(int i = 0; i < out_fhs; i++)

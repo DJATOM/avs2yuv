@@ -1,3 +1,8 @@
+0.28 DJATOM's mod 3 (2016-8-16)
+removed: CSP-related conversion code.
+info: this program doesn't support classic avisynth anymore. The core features now depends on avs+ functions, so it's not possible to support obsolete versions.
+improvement: added support for all new HBD stuff.
+
 0.27 DJATOM's mod 2 (2016-8-12)
 merged: new options from BM's mod 3 (depth, par, fps). Old 'wheels' removed.
 removed: -log option. Guess it useless now.
