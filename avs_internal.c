@@ -23,17 +23,36 @@
  * For more information, contact us at licensing@x264.com.
  *****************************************************************************/
 
+#if defined(_WIN32)
 #include <windows.h>
+#define SYS_WINDOWS 1
+#endif
 
 #define AVSC_NO_DECLSPEC
 #undef EXTERN_C
+
 #include <avisynth_c.h>
+
+#if defined(AVS_POSIX)
+#include <dlfcn.h>
+#if defined(AVS_MACOS)
+#define avs_open() dlopen( "libavisynth.dylib", RTLD_NOW )
+#else
+#define avs_open() dlopen( "libavisynth.so", RTLD_NOW )
+#endif
+#define avs_close dlclose
+#define avs_address dlsym
+#else
+#define avs_open() LoadLibraryW( L"avisynth" )
+#define avs_close FreeLibrary
+#define avs_address GetProcAddress
+#endif
+
 #define AVSC_DECLARE_FUNC(name) name##_func name
-#define SYS_WINDOWS 1
 
 #define LOAD_AVS_FUNC(name, continue_on_fail)\
 {\
-    h->func.name = (name##_func)GetProcAddress(h->library, #name);\
+    h->func.name = (void*)avs_address(h->library, #name);\
     if(!continue_on_fail && !h->func.name)\
         goto fail;\
 }
@@ -42,7 +61,7 @@ typedef struct
 {
     AVS_Clip *clip;
     AVS_ScriptEnvironment *env;
-    HMODULE library;
+    void *library;
     struct
     {
         AVSC_DECLARE_FUNC(avs_add_function);
@@ -130,7 +149,7 @@ typedef struct
 /* load the library and functions we require from it */
 static int internal_avs_load_library(avs_hnd_t *h)
 {
-    h->library = LoadLibrary("avisynth");
+    h->library = avs_open();
     if(!h->library)
         return -1;
     LOAD_AVS_FUNC(avs_add_function, 0);
@@ -214,7 +233,8 @@ static int internal_avs_load_library(avs_hnd_t *h)
     LOAD_AVS_FUNC(avs_bits_per_component, 0);
     return 0;
 fail:
-    FreeLibrary(h->library);
+    avs_close(h->library);
+    h->library = NULL;
     return -1;
 }
 
@@ -232,6 +252,7 @@ static int internal_avs_close_library(avs_hnd_t *h)
     h->func.avs_release_clip(h->clip);
     if(h->func.avs_delete_script_environment)
        h->func.avs_delete_script_environment(h->env);
-    FreeLibrary(h->library);
+    avs_close(h->library);
+    h->library = NULL;
     return 0;
 }

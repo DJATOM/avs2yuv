@@ -13,29 +13,35 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
-#include <io.h>
 #include <fcntl.h>
-#include <avs_internal.c>
-#include <windows.h>
 #include <sys/timeb.h>
 #include <signal.h>
+#include <avs_internal.c>
 
-#ifndef INT_MAX
-#define INT_MAX 0x7fffffff
-#endif
-
-#define MY_VERSION "Avs2YUV 0.28"
-#define AUTHORS "Writen by Loren Merritt, modified by BugMaster, Chikuzen\nand currently maintained by DJATOM"
-#ifdef _MSC_VER
+#if defined(AVS_POSIX)
+#include <unistd.h>
+#else
+#include <io.h>
+#define fileno _fileno
+#define dup _dup
+#define fdopen _fdopen
+#if defined(_MSC_VER)
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
 #define snprintf _snprintf
+typedef signed __int64 int64_t;
 #endif
+#endif
+
+#if !defined(INT_MAX)
+#define INT_MAX 0x7fffffff
+#endif
+
+#define MY_VERSION "Avs2YUV 0.29"
+#define AUTHORS "Writen by Loren Merritt, modified by BugMaster, Chikuzen\nand currently maintained by DJATOM"
 
 #define MAX_FH 10
 #define AVS_BUFSIZE (128*1024)
-
-typedef signed __int64 int64_t;
 
 static volatile int b_ctrl_c = 0;
 
@@ -77,7 +83,9 @@ int main(int argc, const char* argv[])
     int i_frame = 0;
     int64_t i_frame_total = 0;
     int64_t i_start = 0;
+    #if defined(AVS_WINDOWS)
     SetConsoleTitle("avs2yuv: preparing frameserver");
+    #endif
     for(int i = 1; i < argc; i++) {
         if(argv[i][0] == '-' && argv[i][1] != 0) {
             if(!strcmp(argv[i], "-h"))
@@ -194,7 +202,7 @@ add_outfile:
     if(internal_avs_load_library(&avs_h) < 0) {
         fprintf(stderr, "Error: failed to load avisynth.dll.\n");
         goto fail;
-    }        
+    }
     avs_h.env = avs_h.func.avs_create_script_environment(AVISYNTH_INTERFACE_VERSION);
     if(avs_h.func.avs_get_error) {
         const char *error = avs_h.func.avs_get_error(avs_h.env);
@@ -277,10 +285,12 @@ add_outfile:
                     fprintf(stderr, "Error: can't write to stdout multiple times.\n");
                     goto fail;
                 }
-            int dupout = _dup(_fileno(stdout));
+            int dupout = dup(fileno(stdout));
             fclose(stdout);
+            #if defined(AVS_WINDOWS)
             _setmode(dupout, _O_BINARY);
-            out_fh[i] = _fdopen(dupout, "wb");
+            #endif
+            out_fh[i] = fdopen(dupout, "wb");
         } else {
             out_fh[i] = fopen(outfile[i], "wb");
             if(!out_fh[i]) {
@@ -310,7 +320,7 @@ add_outfile:
             sprintf(csp_type, "C420p%d XYSCSS=C420p%d", input_depth, input_depth);
         else if(avs_h.func.avs_bits_per_component(inf) > 8)
             sprintf(csp_type, "C420p%d XYSCSS=C420p%d", avs_h.func.avs_bits_per_component(inf), avs_h.func.avs_bits_per_component(inf));
-        else 
+        else
             sprintf(csp_type, "C420mpeg2");
     } else if(avs_h.func.avs_is_422(inf)) {
         chroma_h_shift = 1;
@@ -346,7 +356,9 @@ add_outfile:
     if(slave) {
         seek = 0;
         end = INT_MAX;
+        #if defined(AVS_WINDOWS)
         SetConsoleTitle("avs2yuv: slave process running");
+        #endif
     } else {
         end += seek;
         if(end <= seek || end > inf->num_frames)
@@ -396,9 +408,11 @@ add_outfile:
                     fflush(out_fh[i]);
             }
         }
+        #if defined(AVS_WINDOWS)
         if(frm == 0) {
             SetConsoleTitle("avs2yuv: executing script");
         }
+        #endif
         if(!nostderr) {
             char buf[400];
             int64_t i_time = avs2yuv_mdate();
@@ -408,8 +422,10 @@ add_outfile:
             int secs = i_elapsed / 1000000;
             int eta = i_elapsed * (i_frame_total - i_frame) / ((int64_t)i_frame * 1000000);
             if(!nostderr) {
+                #if defined(AVS_WINDOWS)
                 sprintf(buf, "avs2yuv [%.1f%%], %d/%d frames, %.2f fps, eta %d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, eta / 3600, (eta / 60) % 60, eta % 60);
                 SetConsoleTitle(buf);
+                #endif
                 static int print_progress_header = 1;
                 if(print_progress_header) {
                     fprintf(stderr, "%6s %12s   %7s %9s %9s\n", "Progress", "Frames", "FPS", "Elapsed", "Remain");
