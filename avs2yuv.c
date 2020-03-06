@@ -20,6 +20,11 @@
 
 #if defined(AVS_POSIX)
 #include <unistd.h>
+#if defined(AVS_MACOS)
+#define AVS_LIBNAME "libavisynth.dylib"
+#else
+#define AVS_LIBNAME "libavisynth.so"
+#endif
 #else
 #include <io.h>
 #define fileno _fileno
@@ -31,6 +36,7 @@
 #define snprintf _snprintf
 typedef signed __int64 int64_t;
 #endif
+#define AVS_LIBNAME "avisynth.dll"
 #endif
 
 #if !defined(INT_MAX)
@@ -200,7 +206,7 @@ add_outfile:
     int retval = 1;
     avs_hnd_t avs_h = {0};
     if(internal_avs_load_library(&avs_h) < 0) {
-        fprintf(stderr, "Error: failed to load avisynth.dll.\n");
+        fprintf(stderr, "Error: failed to load %s.\n", AVS_LIBNAME);
         goto fail;
     }
     avs_h.env = avs_h.func.avs_create_script_environment(AVISYNTH_INTERFACE_VERSION);
