@@ -7,8 +7,16 @@ BIN := avs2yuv
 
 CC := $(CC)
 
-CCFLAGS := -I. -std=gnu99 -Wall -O3 -msse2 -mfpmath=sse -ffast-math -fno-math-errno -flto -fomit-frame-pointer
+CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -flto -fomit-frame-pointer
 LDFLAGS := -Wl,--no-as-needed
+
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_M),i686)
+	CCFLAGS += -msse2 -mfpmath=sse
+endif
+ifeq ($(UNAME_M),x86_64)
+	CCFLAGS += -msse2 -mfpmath=sse
+endif
 
 ifeq (${OS},Windows_NT)
 	CCFLAGS += -I"${AVISYNTH_SDK_PATH}\include"
