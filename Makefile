@@ -19,7 +19,12 @@ endif
 ifeq (${OS},Windows_NT)
 	CCFLAGS += -I"${AVISYNTH_SDK_PATH}\include"
 else
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Haiku)
+	LDFLAGS += -lroot
+else
 	LDFLAGS += -ldl
+endif
 	CCFLAGS += $(shell pkg-config --cflags avisynth)
 endif
 all: $(BIN)
