@@ -25,7 +25,7 @@ else
 ifeq ($(UNAME_S),Haiku)
 	LDFLAGS += -lroot
 else
-	LDFLAGS += -ldl
+	LDFLAGS += -ldl -pthread
 endif
 	CCFLAGS += $(shell pkg-config --cflags avisynth)
 endif
