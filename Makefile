@@ -5,9 +5,7 @@ endif
 OBJECTS := avs2yuv.o
 BIN := avs2yuv
 
-CC := $(CC)
-
-CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -flto -fomit-frame-pointer
+CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -fomit-frame-pointer
 LDFLAGS := -Wl,--no-as-needed
 
 UNAME_M := $(shell uname -m)
