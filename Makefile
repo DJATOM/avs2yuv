@@ -6,7 +6,10 @@ OBJECTS := avs2yuv.o
 BIN := avs2yuv
 
 CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -fomit-frame-pointer
-LDFLAGS := -Wl,--no-as-needed
+UNAME_S := $(shell uname -s)
+ifneq ($(UNAME_S),Darwin)
+	LDFLAGS := -Wl,--no-as-needed
+endif
 
 UNAME_M := $(shell uname -m)
 ifeq ($(UNAME_M),i686)
@@ -19,7 +22,6 @@ endif
 ifeq (${OS},Windows_NT)
 	CCFLAGS += -I"${AVISYNTH_SDK_PATH}\include"
 else
-UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Haiku)
 	LDFLAGS += -lroot
 else
