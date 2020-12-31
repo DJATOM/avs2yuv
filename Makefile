@@ -5,17 +5,29 @@ endif
 OBJECTS := avs2yuv.o
 BIN := avs2yuv
 
-CC := gcc
-
-CCFLAGS := -I. -std=gnu99 -Wall -O3 -msse2 -mfpmath=sse -ffast-math -fno-math-errno -flto -fomit-frame-pointer
-LDFLAGS :=
-
+CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -fomit-frame-pointer
 UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Linux)
-	LDFLAGS += -ldl
-	CCFLAGS += -I/usr/local/include/avisynth
-else ifeq (${OS},Windows_NT)
+ifneq ($(UNAME_S),Darwin)
+	LDFLAGS := -Wl,--no-as-needed
+endif
+
+UNAME_M := $(shell uname -m)
+ifeq ($(UNAME_M),i686)
+	CCFLAGS += -msse2 -mfpmath=sse
+endif
+ifeq ($(UNAME_M),x86_64)
+	CCFLAGS += -msse2 -mfpmath=sse
+endif
+
+ifeq (${OS},Windows_NT)
 	CCFLAGS += -I"${AVISYNTH_SDK_PATH}\include"
+else
+ifeq ($(UNAME_S),Haiku)
+	LDFLAGS += -lroot
+else
+	LDFLAGS += -ldl -pthread
+endif
+	CCFLAGS += $(shell pkg-config --cflags avisynth)
 endif
 all: $(BIN)
 
