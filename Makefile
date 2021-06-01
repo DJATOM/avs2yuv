@@ -5,7 +5,7 @@ endif
 OBJECTS := avs2yuv.o
 BIN := avs2yuv
 
-CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -fomit-frame-pointer
+CCFLAGS := -I. -std=gnu99 -Wall -O3 -ffast-math -fno-math-errno -fomit-frame-pointer $(CFLAGS)
 UNAME_S := $(shell uname -s)
 ifneq ($(UNAME_S),Darwin)
 	LDFLAGS := -Wl,--no-as-needed

@@ -14,7 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#ifdef OLD_TIME_BEHAVIOR
 #include <sys/timeb.h>
+#endif
 #include <signal.h>
 #include <avs_internal.c>
 
@@ -59,9 +61,15 @@ void sigintHandler(int sig_num)
 
 int64_t avs2yuv_mdate(void)
 {
+#ifdef OLD_TIME_BEHAVIOR
     struct timeb tb;
     ftime(&tb);
     return ((int64_t)tb.time * 1000 + (int64_t)tb.millitm) * 1000;
+#else
+    struct timespec tb;
+    clock_gettime(CLOCK_MONOTONIC, &tb);
+    return ((int64_t)tb.tv_sec * 1000 + (int64_t)tb.tv_nsec / 1000000) * 1000;
+#endif
 }
 
 int main(int argc, const char* argv[])
