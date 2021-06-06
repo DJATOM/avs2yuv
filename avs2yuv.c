@@ -14,9 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#ifdef OLD_TIME_BEHAVIOR
-#include <sys/timeb.h>
-#endif
 #include <signal.h>
 #include <avs_internal.c>
 
@@ -39,6 +36,22 @@
 typedef signed __int64 int64_t;
 #endif
 #define AVS_LIBNAME "avisynth.dll"
+#endif
+
+#if defined(AVS_MACOS)
+#if defined(PPC32)
+// AviSynth+ can be built/run natively on OS X 10.4 and 10.5,
+//  which are the last two versions that can be used on PPC.
+// clock_gettime() support was introduced for macOS in 10.12,
+// so we definitely need ftime if we're on a PPC version of OSX.
+// Intel users between 10.6 and 10.11 will have to force it
+// by passing CFLAGS during make.
+#define OLD_TIME_BEHAVIOR
+#endif
+#endif
+
+#ifdef OLD_TIME_BEHAVIOR
+#include <sys/timeb.h>
 #endif
 
 #if !defined(INT_MAX)
