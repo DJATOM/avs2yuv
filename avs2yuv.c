@@ -15,7 +15,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <avs_internal.c>
+#include "avs_internal.c"
 
 #if defined(AVS_POSIX)
 #include <unistd.h>
@@ -34,6 +34,8 @@
 #define strncasecmp _strnicmp
 #define snprintf _snprintf
 typedef signed __int64 int64_t;
+// MSVC specifically lacks clock_gettime.
+#define OLD_TIME_BEHAVIOR
 #endif
 #define AVS_LIBNAME "avisynth.dll"
 #endif
