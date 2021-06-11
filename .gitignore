@@ -1,0 +1,8 @@
+*.vcxproj*
+CMakeCache.txt
+CMakeFiles/*
+*.dir/*
+*.sln
+cmake_install.cmake
+cmake_uninstall.cmake
+x64/*
