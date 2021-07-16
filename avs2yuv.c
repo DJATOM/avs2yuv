@@ -43,7 +43,7 @@ typedef signed __int64 int64_t;
 #define INT_MAX 0x7fffffff
 #endif
 
-#define MY_VERSION "Avs2YUV 0.29"
+#define MY_VERSION "Avs2YUV 0.30"
 #define AUTHORS "Writen by Loren Merritt, modified by BugMaster, Chikuzen\nand currently maintained by DJATOM"
 
 #define MAX_FH 10
@@ -76,7 +76,7 @@ int main(int argc, const char* argv[])
     int seek = 0;
     int end = 0;
     int slave = 0;
-    int rawyuv = 0;
+    int raw_output = 0;
     int interlaced = 0;
     int tff = 0;
     int input_depth = 8;
@@ -119,7 +119,10 @@ int main(int argc, const char* argv[])
                 }
                 end = atoi(argv[++i]);
             } else if(!strcmp(argv[i], "-raw")) {
-                rawyuv = 1;
+                raw_output = 1;
+                if (!nostderr) {
+                    fprintf(stderr, "Warning: output will not contain any headers!\nYou will have to point resolution, framerate and format (and duration) manually to your reading software.\n");
+                }
             } else if(!strcmp(argv[i], "-slave")) {
                 slave = 1;
             } else if(!strcmp(argv[i], "-depth")) {
@@ -183,7 +186,7 @@ add_outfile:
                 return 2;
             }
             outfile[out_fhs] = argv[i];
-            y4m_headers[out_fhs] = !rawyuv;
+            y4m_headers[out_fhs] = !raw_output;
             out_fhs++;
         }
     }
@@ -344,8 +347,10 @@ add_outfile:
         else
             sprintf(csp_type, "C444");
     } else {
-        fprintf(stderr, "Error: unsupported colorspace.\n");
-        goto fail;
+        if(!raw_output) {
+            fprintf(stderr, "Error: unsupported colorspace.\nYou still can output any format in headerless mode. Use \"-raw\" option if you really need that.\n");
+            goto fail;
+        }
     }
     for(int i = 0; i < out_fhs; i++) {
         if(setvbuf(out_fh[i], NULL, _IOFBF, AVS_BUFSIZE)) {
