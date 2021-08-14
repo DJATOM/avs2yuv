@@ -14,9 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/timeb.h>
 #include <signal.h>
-#include <avs_internal.c>
+#include "avs_internal.c"
 
 #if defined(AVS_POSIX)
 #include <unistd.h>
@@ -35,8 +34,26 @@
 #define strncasecmp _strnicmp
 #define snprintf _snprintf
 typedef signed __int64 int64_t;
+// MSVC specifically lacks clock_gettime.
+#define OLD_TIME_BEHAVIOR
 #endif
 #define AVS_LIBNAME "avisynth.dll"
+#endif
+
+#if defined(AVS_MACOS)
+#if defined(PPC32)
+// AviSynth+ can be built/run natively on OS X 10.4 and 10.5,
+//  which are the last two versions that can be used on PPC.
+// clock_gettime() support was introduced for macOS in 10.12,
+// so we definitely need ftime if we're on a PPC version of OSX.
+// Intel users between 10.6 and 10.11 will have to force it
+// by passing CFLAGS during make.
+#define OLD_TIME_BEHAVIOR
+#endif
+#endif
+
+#ifdef OLD_TIME_BEHAVIOR
+#include <sys/timeb.h>
 #endif
 
 #if !defined(INT_MAX)
@@ -59,9 +76,15 @@ void sigintHandler(int sig_num)
 
 int64_t avs2yuv_mdate(void)
 {
+#ifdef OLD_TIME_BEHAVIOR
     struct timeb tb;
     ftime(&tb);
     return ((int64_t)tb.time * 1000 + (int64_t)tb.millitm) * 1000;
+#else
+    struct timespec tb;
+    clock_gettime(CLOCK_MONOTONIC, &tb);
+    return ((int64_t)tb.tv_sec * 1000 + (int64_t)tb.tv_nsec / 1000000) * 1000;
+#endif
 }
 
 int main(int argc, const char* argv[])
