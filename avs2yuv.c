@@ -306,7 +306,6 @@ add_outfile:
     //start processing
     i_start = avs2yuv_mdate();
     time_t tm_s = time(0);
-    i_frame_total = inf->num_frames;
     if(b_ctrl_c)
         goto close_files;
     avs_h.func.avs_release_value(res);
@@ -398,6 +397,7 @@ add_outfile:
         if(end <= seek || end > inf->num_frames)
             end = inf->num_frames;
     }
+    i_frame_total = end - seek;
     for(int frm = seek; frm < end; ++frm) {
         if(slave) {
             char input[80];
@@ -455,7 +455,6 @@ add_outfile:
             i_frame = frm + 1;
             int secs = i_elapsed / 1000000;
             int eta = i_elapsed * (i_frame_total - i_frame + seek) / ((int64_t)(i_frame - seek) * 1000000);
-            i_frame_total = end - seek;
             if(!nostderr) {
                 #if defined(AVS_WINDOWS)
                 sprintf(buf, "avs2yuv [%.1f%%], %d/%d frames, %.2f fps, eta %d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, eta / 3600, (eta / 60) % 60, eta % 60);
