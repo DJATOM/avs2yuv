@@ -12,5 +12,5 @@ mkdir build
 cd build
 cmake ..
 make
-make install (as root)
+[sudo] make install
 ```
