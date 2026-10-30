@@ -306,7 +306,6 @@ add_outfile:
     //start processing
     i_start = avs2yuv_mdate();
     time_t tm_s = time(0);
-    i_frame_total = inf->num_frames;
     if(b_ctrl_c)
         goto close_files;
     avs_h.func.avs_release_value(res);
@@ -398,6 +397,7 @@ add_outfile:
         if(end <= seek || end > inf->num_frames)
             end = inf->num_frames;
     }
+    i_frame_total = end - seek;
     for(int frm = seek; frm < end; ++frm) {
         if(slave) {
             char input[80];
@@ -451,10 +451,10 @@ add_outfile:
             char buf[400];
             int64_t i_time = avs2yuv_mdate();
             int64_t i_elapsed = i_time - i_start;
-            double fps = i_elapsed > 0 ? frm * 1000000. / i_elapsed : 0;
+            double fps = i_elapsed > 0 ? (frm - seek) * 1000000. / i_elapsed : 0;
             i_frame = frm + 1;
             int secs = i_elapsed / 1000000;
-            int eta = i_elapsed * (i_frame_total - i_frame) / ((int64_t)i_frame * 1000000);
+            int eta = i_elapsed * (i_frame_total - i_frame + seek) / ((int64_t)(i_frame - seek) * 1000000);
             if(!nostderr) {
                 #if defined(AVS_WINDOWS)
                 sprintf(buf, "avs2yuv [%.1f%%], %d/%d frames, %.2f fps, eta %d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, eta / 3600, (eta / 60) % 60, eta % 60);
@@ -462,10 +462,18 @@ add_outfile:
                 #endif
                 static int print_progress_header = 1;
                 if(print_progress_header) {
-                    fprintf(stderr, "%6s %12s   %7s %9s %9s\n", "Progress", "Frames", "FPS", "Elapsed", "Remain");
+                    if ( (end < inf->num_frames) || (seek > 0) ) {
+                        fprintf(stderr, "%6s %12s %12s   %7s %9s %9s\n", "Progress", "Frames", "Frame#", "FPS", "Elapsed", "Remain");
+                    } else {
+                        fprintf(stderr, "%6s %12s   %7s %9s %9s\n", "Progress", "Frames", "FPS", "Elapsed", "Remain");
+                    }
                     print_progress_header = 0;
                 }
-                sprintf(buf, "[%5.1f%%] %6d/%-6d %8.2f %3d:%02d:%02d %3d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60);
+                if ( (end < inf->num_frames) || (seek > 0) ) {
+                    sprintf(buf, "[%5.1f%%] %6d/%-6d      %6d  %8.2f %3d:%02d:%02d %3d:%02d:%02d", 100. * (i_frame - seek) / i_frame_total, i_frame - seek, (int)i_frame_total, frm, fps, secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60);
+                } else {
+                    sprintf(buf, "[%5.1f%%] %6d/%-6d %8.2f %3d:%02d:%02d %3d:%02d:%02d", 100. * frm / i_frame_total, frm, (int)i_frame_total, fps, secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60);
+                }
                 fprintf(stderr, "%s   \r", buf);
             }
             fflush(stderr);
